@@ -3,7 +3,6 @@ import serial
 import pyqtgraph as pg
 from pyqtgraph.Qt import QtCore
 import scipy
-import random
     
 #--------------------------------------------------------------------------------------
 
@@ -33,7 +32,7 @@ def generate_colorBarItem(plot_title:str, win):
 def generate_window():
     app = pg.mkQApp("Real-time signals")
     win = pg.GraphicsLayoutWidget(show=True, title="EEG")
-    win.resize(1000,600)
+    # win.resize(700,700)
     win.setWindowTitle('Real-time signals: Plotting')
     pg.setConfigOptions(antialias=True)
 
@@ -43,15 +42,17 @@ def generate_window():
 
 
 #Function that updates all the plots data in real time
-def update(s, start_bytes, n, ch1, ch2, fft1, fft2, curve, curve2, curve3, curve4, img, bar, img2, bar2):
+def update(s, start_bytes, n, ch1, ch2, fft1, fft2, curve, curve2, curve3, curve4, img, bar, img2, bar2, Sxx_acum, Sxx_acum2):
     
     # global ch1, ch2, n
 
     #Leer hasta encontrar los bytes esperados (b'\xa5\x5a\x02')
     res = s.read_until(expected=start_bytes)
+    ch1[:-(n//3)] = ch1[(n//3):]
+    ch2[:-(n//3)] = ch2[(n//3):]
 
     #Lee n arreglos de bytes
-    for i in range(n):
+    for i in range(2*n//3,n):
         
         res = s.read_until(expected=start_bytes)
 
@@ -59,10 +60,11 @@ def update(s, start_bytes, n, ch1, ch2, fft1, fft2, curve, curve2, curve3, curve
         #Se elige canal ch1_high y ch1_low
         #Se procesa para que sea legible
         ch1[i] = res_list[1]*256 + res_list[2]
+        
         ch2[i] = res_list[3]*256 + res_list[4]
 
-    fft1 =  np.absolute(scipy.fft.rfft(ch1))
-    fft2 =  np.absolute(scipy.fft.rfft(ch2))
+    fft1 =  np.absolute(scipy.fft.rfft(ch1-np.mean(ch1)))
+    fft2 =  np.absolute(scipy.fft.rfft(ch2-np.mean(ch2)))
             
     #Actualizar la data
     curve.setData(ch1)
@@ -83,12 +85,14 @@ def update(s, start_bytes, n, ch1, ch2, fft1, fft2, curve, curve2, curve3, curve
 
 #--------------------------------------------------------------------------------------
 
-def main():
+def plot():
     #Declaration of variables
     ptr = 0
-    n = 200
+    n = 70
     ch1 = np.zeros(n)
     ch2 = np.zeros(n)
+    Sxx_acum = []
+    Sxx_acum2 = []
     
     #Open COM port
     s = serial.Serial(port='COM3', baudrate=57600, bytesize=serial.EIGHTBITS, parity=serial.PARITY_NONE, stopbits=serial.STOPBITS_ONE, timeout=None, xonxoff=False, rtscts=False, write_timeout=None, dsrdtr=False, inter_byte_timeout=None, exclusive=None) 
@@ -100,13 +104,13 @@ def main():
     win = generate_window()
     
     #creation of window and plots
-    eeg_plot1, curve_plot1 = generate_plot('channel 1 in real time: Plotting', [0,100], [-200,1200], win)
-    eeg_plot2, curve_plot2 = generate_plot('Canal 2 in real time: Plotting', [0,100], [-200,1200], win)
+    eeg_plot1, curve_plot1 = generate_plot('channel 1 in real time: Plotting', [0,70], [-200,1200], win)
+    eeg_plot2, curve_plot2 = generate_plot('Canal 2 in real time: Plotting', [0,70], [-200,1200], win)
     
     win.nextRow()
     
-    fft_plot1, curve_fft1 = generate_plot('channel 1 fourier in real time: Plotting', [0,100], [0,8000], win)
-    fft_plot2, curve_fft2 = generate_plot('Canal 2 fourier in real time: Plotting', [0,100], [0,8000], win)
+    fft_plot1, curve_fft1 = generate_plot('channel 1 fourier in real time: Plotting', [0,35], [0,1000], win)
+    fft_plot2, curve_fft2 = generate_plot('Canal 2 fourier in real time: Plotting', [0,35], [0,1000], win)
     
     win.nextRow()
 
@@ -114,14 +118,14 @@ def main():
     bar2, img2 = generate_colorBarItem("Spectogram ch2", win)
 
     timer = QtCore.QTimer()
-    timer.timeout.connect(lambda: update(s, start_bytes, n, ch1, ch2, fft_plot1, fft_plot2, curve_plot1, curve_plot2, curve_fft1, curve_fft2, img, bar, img2, bar2))
+    timer.timeout.connect(lambda: update(s, start_bytes, n, ch1, ch2, fft_plot1, fft_plot2, curve_plot1, curve_plot2, curve_fft1, curve_fft2, img, bar, img2, bar2, Sxx_acum, Sxx_acum2))
 
     #Milliseconds interval between data updates
-    timer.start(500)
+    timer.start(150)
     pg.exec()
 
 #--------------------------------------------------------------------------------------
 
 if __name__ == '__main__':
-    main()
+    plot()
     
