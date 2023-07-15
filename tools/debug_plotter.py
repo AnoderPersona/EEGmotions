@@ -7,6 +7,8 @@ from pyqtgraph.Qt.QtCore import Qt
 import scipy
 from scipy import signal
 
+from torcheeg.transforms import BandDifferentialEntropy
+
 class Plotter:
     def __init__(self):
         #Declaration of variables
@@ -29,13 +31,16 @@ class Plotter:
         self.port               =  'COM3'
         self.baud_rate          =   57600
         self.spec_count         =   0
-        self.count_max          =   7
+        self.count_max          =   50
         
         self.x_lim_color_plot    =  (0,self.count_max)
         self.y_lim_color_plot    =  (0,self.count_max)
         
         self.Sxx_acum           =   []
         self.Sxx_acum_2         =   []
+        
+        self.DE                 =   0
+        self.DE_2               =   0
             
     def set_port(self, port:str):
         '''Sets the serial port of the reader (has to be 'COM'+number i.e. 'COM3' '''
@@ -87,39 +92,51 @@ class Plotter:
             
             self.ch2[i] = res_list[3]*256 + res_list[4]
 
-        fft1 =  np.absolute(scipy.fft.rfft(self.ch1-np.mean(self.ch1)))
-        fft2 =  np.absolute(scipy.fft.rfft(self.ch2-np.mean(self.ch2)))
+        if (len(res_list) == 17):
+            
+            fft1 =  np.absolute(scipy.fft.rfft(self.ch1-np.mean(self.ch1)))
+            fft2 =  np.absolute(scipy.fft.rfft(self.ch2-np.mean(self.ch2)))
+                    
+            #Updating plot data
+            self.curve_plot1.setData(self.ch1)
+            self.curve_plot2.setData(self.ch2)
+
+            self.curve_fft1.setData(fft1)
+            self.curve_fft2.setData(fft2)
+            
+            # Sxx = np.absolute(scipy.fft.rfft(self.ch1)-np.mean(self.ch1))
+            # Sxx2 = np.absolute(scipy.fft.rfft(self.ch2)-np.mean(self.ch2))
+
+            if (self.spec_count < self.count_max):
+
+                self.Sxx_acum.append(np.log(1+fft1))
+
+                self.img.setImage(np.array(self.Sxx_acum))
+                # self.bar.setLevels([min(Sxx), max(Sxx)])
                 
-        #Updating plot data
-        self.curve_plot1.setData(self.ch1)
-        self.curve_plot2.setData(self.ch2)
+                self.Sxx_acum_2.append(np.log(1+fft2))
 
-        self.curve_fft1.setData(fft1)
-        self.curve_fft2.setData(fft2)
-        
-        Sxx = np.absolute(scipy.fft.rfft(self.ch1))
-        Sxx2 = np.absolute(scipy.fft.rfft(self.ch2))
+                self.img2.setImage(np.array(self.Sxx_acum_2))
+                # self.bar2.setLevels([min(Sxx2), max(Sxx2)])
+                
+                self.spec_count += 1
 
-        if (self.spec_count < self.count_max):
+            else:            
+                
+                #EN PROCESO CHECKPOINT WIP
+                # transform = BandDifferentialEntropy()
+                
+                # self.DE = transform(eeg=(self.Sxx_acum), sampling_rate = 256)['eeg']
+                # self.DE_2 = transform(eeg=(self.Sxx_acum_2), sampling_rate = 256)['eeg']
+                
+                # print(self.DE_2)
+                
+                #FIN DEL WIP
+                
+                self.Sxx_acum.clear()
+                self.Sxx_acum_2.clear()
 
-            self.Sxx_acum.append(Sxx)
-
-            self.img.setImage(np.array(self.Sxx_acum))
-            self.bar.setLevels([min(Sxx), max(Sxx)])
-            
-            self.Sxx_acum_2.append(Sxx)
-
-            self.img2.setImage(np.array(self.Sxx_acum_2))
-            self.bar2.setLevels([min(Sxx2), max(Sxx2)])
-            
-            self.spec_count += 1
-
-            
-        else:            
-            self.Sxx_acum.clear()
-            self.Sxx_acum_2.clear()
-
-            self.spec_count = 0
+                self.spec_count = 0
             
     def plot(self):
         self.s = serial.Serial(port=self.port, baudrate=self.baud_rate, bytesize=serial.EIGHTBITS, parity=serial.PARITY_NONE, stopbits=serial.STOPBITS_ONE, timeout=None, xonxoff=False, rtscts=False, write_timeout=None, dsrdtr=False, inter_byte_timeout=None, exclusive=None) 
@@ -142,6 +159,9 @@ class Plotter:
         self.bar, self.img, self.color_plot= self.generate_colorBarItem("Spectogram ch1")
         self.bar2, self.img2, self.color_plot2 = self.generate_colorBarItem("Spectogram ch2")
         
+        self.color_plot.setXRange(0,50,padding=0)
+        self.color_plot2.setXRange(0,50,padding=0)
+        
         self.color_plot.addLine(y=3, pen=pg.mkPen('r', width=1))
         self.color_plot.addLine(y=7, pen=pg.mkPen('r', width=1))
         self.color_plot.addLine(y=13, pen=pg.mkPen('r', width=1))
@@ -161,3 +181,42 @@ class Plotter:
         timer.start(150)
         pg.exec()
 
+
+    #CHECKPOINT 2
+    def get_EEG_data(self):
+        
+        self.s = serial.Serial(port=self.port, baudrate=self.baud_rate, bytesize=serial.EIGHTBITS, parity=serial.PARITY_NONE, stopbits=serial.STOPBITS_ONE, timeout=None, xonxoff=False, rtscts=False, write_timeout=None, dsrdtr=False, inter_byte_timeout=None, exclusive=None) 
+        print('Starting...')
+        
+        self.Sxx_acum.clear()
+        self.Sxx_acum_2.clear()
+        res = self.s.read_until(expected=self.start_bytes)
+
+        # for i in range(self.n):
+            
+        res = self.s.read_until(expected=self.start_bytes)
+
+        res_list = list(res)
+        # #Picks ch1_high and ch1_low
+        # #Processing data so it's usable
+        
+        ch1 = res_list[1]*256 + res_list[2]
+        ch2 = res_list[3]*256 + res_list[4]
+            
+        fft1 =  np.absolute(scipy.fft.rfft(self.ch1-np.mean(ch1)))
+        fft2 =  np.absolute(scipy.fft.rfft(self.ch2-np.mean(ch2)))
+        
+        # fft1 = np.zeros(1)
+        # fft2 = np.zeros(1)
+        fft = np.array([np.log(1+fft1)]+[np.log(1+fft2)])
+        print(fft, fft.shape)
+        
+        transform = BandDifferentialEntropy(sampling_rate= 256, order= 5, band_dict = {'alpha': [8, 13], 'beta': [14, 30], 'gamma': [31, 50], 'theta': [4, 7], 'delta': [0.5, 3]}, apply_to_baseline= False)
+        # transform = BandDifferentialEntropy()
+        
+        self.DE = transform(eeg=fft)['eeg']
+        
+        return [self.DE,self.DE_2]
+                
+                
+                
