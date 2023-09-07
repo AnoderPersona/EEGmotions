@@ -28,12 +28,17 @@ model_valence_url = './tools/model/model_2classes_valence.h5'
 arousal_model = tf.keras.models.load_model(model_arousal_url)
 valence_model = tf.keras.models.load_model(model_valence_url)
 
+# Variables for the FFT 
+band = [4,8,12,16,25,45] #5 bands
+window_size = 256 #Averaging band power of 2 sec
+step_size = 16 #Each 0.125 sec update once
+sample_rate = 128 #Sampling rate of 128 Hz
 scaler = StandardScaler()
 
 # Util functions -------------------------------------------------------------------------------------
 
 # FFT processing function, modified version of code in https://github.com/siddhi5386/Emotion-Recognition-from-brain-EEG-signals-/blob/master/Emotion_recognition_using_CNN.ipynb
-def FFT_Processing(data_batch, band, window_size, step_size, sample_rate):
+def FFT_Processing(data_batch):
 
     processed_data = []
     batch_size = data_batch.shape[0]
@@ -56,34 +61,47 @@ def FFT_Processing(data_batch, band, window_size, step_size, sample_rate):
 
     return np.array(processed_data)
 
+def model_processing(data):
+
+    # Neutral threshold for calibrating the model
+    neutral_threshold = [0.5, 0.6]
+
+    # Normalising data
+    data = normalize(data)
+    data = scaler.fit_transform(data)
+
+    # Get prediction
+    arousal = arousal_model.predict(data)
+    valence = valence_model.predict(data)
+
+    # Valence needs calibration, so a neutral state is added to minimize false negatives
+    predicted_valence = np.array([2 if (x[0] > neutral_threshold[0] and x[0] < neutral_threshold[1]) else np.argmax(x) for x in valence])
+    predicted_arousal = np.argmax(arousal, axis=1)
+
+    print(valence, arousal)
+    print(predicted_valence, predicted_arousal)
+
+    # Get most repeated value in time windows
+    predicted_valence = st.mode(predicted_valence)
+    predicted_arousal = st.mode(predicted_arousal)
+
+    print(predicted_valence, predicted_arousal)
+
+    return [int(predicted_valence[0]), int(predicted_arousal[0])]
+    
+
 
 # Async functions -------------------------------------------------------------------------------------
 @app.post("/data/raw/")
 async def receive_raw_data(initial_data: Item):
 
-    #Data for the FFT
-    band = [4,8,12,16,25,45] #5 bands
-    window_size = 256 #Averaging band power of 2 sec
-    step_size = 16 #Each 0.125 sec update once
-    sample_rate = 128 #Sampling rate of 128 Hz
-
+    # Receives data
     eeg_data = ast.literal_eval(initial_data.data)
 
+    # Turns python list into np.array 
     np_eeg_data = np.array([np.array(x) for x in eeg_data])
-    de_data = FFT_Processing(np_eeg_data, band, window_size, step_size, sample_rate)
+    fft_data = FFT_Processing(np_eeg_data)
 
-    de_data = normalize(de_data)
-    de_data = scaler.fit_transform(de_data)
-
-    arousal = arousal_model.predict(de_data)
-    valence = valence_model.predict(de_data)
-
-    predicted_arousal = st.mode(np.argmax(arousal, axis=1))
-    predicted_valence = st.mode(np.argmax(valence, axis=1))
-
-    print(np.argmax(arousal, axis=1), np.argmax(valence, axis=1))
-    print(predicted_arousal, predicted_valence)
-
-    mode_result = [int(predicted_valence[0]), int(predicted_arousal[0])]
-
+    # Get and send final result
+    mode_result = model_processing(fft_data)
     return mode_result
