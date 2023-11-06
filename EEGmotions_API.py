@@ -21,8 +21,8 @@ app = FastAPI()
 #Load model just once--------------------------------------------------------------------------------
 
 #For these models, ch1 is FP2 and ch2 is F8
-model_arousal_url = './tools/model/model_2classes_arousal.h5'
-model_valence_url = './tools/model/model_2classes_valence.h5'
+model_arousal_url = './tools/model/model_2classes_arousal_best.h5'
+model_valence_url = './tools/model/model_2classes_valence_best.h5'
 
 # CNN models slightly changed from: https://github.com/siddhi5386/Emotion-Recognition-from-brain-EEG-signals-/
 arousal_model = tf.keras.models.load_model(model_arousal_url)
@@ -64,11 +64,12 @@ def FFT_Processing(data_batch):
 def model_processing(data):
 
     # Neutral threshold for calibrating the model
-    neutral_threshold = [0.5, 0.6]
+    neutral_threshold = [0.5, 0.62]#[0.5, 0.7]
 
     # Normalising data
-    data = normalize(data)
+    data = np.array(normalize(data)[:])
     data = scaler.fit_transform(data)
+    data = data.reshape(data.shape[0],data.shape[1], 1)
 
     # Get prediction
     arousal = arousal_model.predict(data)
@@ -76,6 +77,7 @@ def model_processing(data):
 
     # Valence needs calibration, so a neutral state is added to minimize false negatives
     predicted_valence = np.array([2 if (x[0] > neutral_threshold[0] and x[0] < neutral_threshold[1]) else np.argmax(x) for x in valence])
+    #predicted_valence = np.argmax(valence, axis=1)
     predicted_arousal = np.argmax(arousal, axis=1)
 
     print(valence, arousal)
