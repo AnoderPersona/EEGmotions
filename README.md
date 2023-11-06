@@ -11,7 +11,7 @@ Using pyQTGraph, it allows the graphs to be interactive, so if you right click o
 
 The model used for EEGmotions is a CNN from the repository [Emotion-Recognition-from-brain-EEG-signals](https://github.com/siddhi5386/Emotion-Recognition-from-brain-EEG-signals-). Using DEAP dataset to train both arousal and valence into two different classes (positive-negative), this version of the model predicts both by using only two channels; FP2 and F8 in that order.
 
-Both models ended up with about 0,69 - 0,70 of accuracy for arousal and valence respectevely for the dataset. This version of the model is mostly used for demonstration, *I highly suggest to use your own model if you want to get the best results.*
+Both models ended up with about 0,69 - 0,70 of accuracy for arousal and valence respectevely for the dataset. This version of the model is mostly used for demonstration of the API and it <b>does not work</b> for actual real life testing.
 
 ## client_template.py
 
