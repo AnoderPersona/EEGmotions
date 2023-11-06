@@ -114,9 +114,11 @@ def neutral():
 def send_data():
 
     server_url = 'http://localhost:8000'
-
-    for i in range(100):
-
+    
+    cont_pos = 0
+    cont_neg = 0
+    #for i in range(100):
+    while True:
         # Reads sends data to API
         reader = read_smt_data.Data_reader()
         eeg_data = reader.read_data().tolist()
@@ -137,6 +139,9 @@ def send_data():
             turtle.clear()
 
             if valence == 0:
+
+                cont_neg += 1
+
                 if arousal == 0:
                     # low valence and arousal
                     turtle.Screen().bgcolor("blue")
@@ -148,6 +153,9 @@ def send_data():
                     low_valence_high_arousal()
 
             elif valence == 1:
+
+                cont_pos += 1
+
                 if arousal == 0:
                     # high valence low arousal
                     turtle.Screen().bgcolor("yellow")
@@ -163,6 +171,9 @@ def send_data():
                 turtle.Screen().bgcolor("gray")
                 neutral()
 
+            f = open("stats.txt", "w")
+            f.write(f"Pos: {cont_pos}\nNeg: {cont_neg}, total:{cont_pos+cont_neg}")
+            f.close()
 
         else:
             print('There was a problem with the transaction')
