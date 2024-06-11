@@ -1,4 +1,4 @@
-# EEGmotions (WIP)
+# EEGmotions (forever-beta)
 
 EEGmotions is an API based on fastAPI, capable of reading signals of an EEG-SMT reader. The API processes the signals from the two channels through an AI model, resulting in labels that describe real-time emotions through valence and arousal. With the help of EEGmotions, it will be easier to develop software that responds to emotions from EEG signals.
 
